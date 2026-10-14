@@ -169,6 +169,33 @@ class Turtlebot():
             goal_cross_2 = p.addUserDebugLine([intermediate_goal[0], intermediate_goal[1] - size, 0.1], [intermediate_goal[0], intermediate_goal[1] + size, 0.1], lineColorRGB=[0, 0, 1], lineWidth=3)
             self.old_goals.append((intermediate_goal, goal_cross_1, goal_cross_2))
 
+    def sample_state(bounds):
+        """Return [x, y]: GOAL with 50% probability, else uniform random in the arena."""
+
+    def nearest_node(nodes, sample):
+        """Return the index of the tree node closest (Euclidean x,y) to the sample."""
+
+    def in_collision(turtlebot, x, y, th):
+        """Teleport robot to (x, y, th), run p.performCollisionDetection(),
+        return True if touching any obstacle."""
+
+    def propagate(turtlebot, node, v, w, duration, dt=0.05):
+        """Integrate the unicycle model from node for `duration` seconds.
+        Check collision at every small step.
+        Return (x, y, th, traj) if collision-free, else None."""
+
+    def extend(turtlebot, nodes, near_idx, sample, n_props=5):
+        """Run 5 propagations from nodes[near_idx] with random v, w, duration.
+        Discard collisions, keep the one ending closest to the sample.
+        Return the new node dict, or None if all 5 collided."""
+
+    def reached_goal(node, goal, radius):
+        """True if the node is within radius of the goal."""
+
+    def extract_path(nodes, goal_idx):
+        """Follow parent pointers back to the root.
+        Return the list of [x, y, z] points from start to goal."""
+
 
 ### MAIN - implement your solution here! ###
 
