@@ -201,38 +201,102 @@ class Turtlebot():
 
         return closest_idx
 
-    def in_collision(turtlebot, x, y, th):
+    def in_collision(self, x, y, th):
         """Teleport robot to (x, y, th), run p.performCollisionDetection(),
         return True if touching any obstacle."""
         #Angle to quaternion for pybullet
         quat = p.getQuaternionFromEuler([0, 0, th])
 
         #Move robo to spot
-        turtlebot.teleport([x, y, 0], quat)
+        self.teleport([x, y, 0], quat)
 
         #Have pybullet update contacts
         p.performCollisionDetection()
 
         #See if robo is touching block or wall
-        for obstacles in turtlebot.obstacles:
-            contacts = p.getContactPoints(bodyA = turtlebot.turtleId, bodyB = obstacles)
+        for obstacles in self.obstacles:
+            contacts = p.getContactPoints(bodyA = self.turtleId, bodyB = obstacles)
             if len(contacts) > 0:
                 return True
         return False
 
 
-    def propagate(turtlebot, node, v, w, duration, dt=0.05):
+    def propagate(self, node, v, w, duration, dt=0.05):
         """Integrate the unicycle model from node for `duration` seconds.
         Check collision at every small step.
         Return (x, y, th, traj) if collision-free, else None."""
+        #Get starting node position and angle 
+        x = node["x"]
+        y = node["y"]
+        th = node["th"]
+        path = [[x, y, 0]]
 
-    def extend(turtlebot, nodes, near_idx, sample, n_props=5):
+        #Find out how many steps we need to take 
+        steps = math.floor(duration / dt)
+
+        #move robot forward and turn robot 
+        for i in range(steps):
+            x = x + v * dt * math.cos(th)
+            y = y + v * dt * math.sin(th)
+            th = th + w * dt 
+
+            #Check to see if we hit something 
+            if self.in_collision(x, y, th):
+                return None
+
+            #Save our current loc/path
+            path.append([x, y, 0])
+        return x, y, th, path
+
+    def extend(self, nodes, near_idx, sample, n_props=5):
         """Run 5 propagations from nodes[near_idx] with random v, w, duration.
         Discard collisions, keep the one ending closest to the sample.
         Return the new node dict, or None if all 5 collided."""
+        #This should work like steer but its trying 5 random moves and keeping the best one
 
-    def reached_goal(node, goal, radius):
+        near_node = nodes[near_idx]
+
+        closest_node = None
+        closest_dist = float("inf")
+
+        #Pick a random v, w, and time to drive for
+        #Drive for ^
+        #Check to see if crashed and keep the ones that dont
+        #Keep closest sampled one
+        for i in range(n_props):
+
+            v = random.uniform(.2, .7)
+            w = random.uniform(-1.5, 1.5)
+            time = random.uniform(.5, 1.5)
+
+            drive = self.propagate(near_node, v, w, time)
+
+            if drive is None:
+                continue
+
+            x, y, th, path = drive
+
+            #Draw valid paths
+            self.plot_path("red", path)
+
+            dx = sample[0] - x
+            dy = sample[1] - y
+
+            dist = math.sqrt(dx**2 + dy**2)
+
+            #Find the closest one and update it 
+            if dist < closest_dist:
+                closest_dist = dist
+                closest_node = {"x": x, "y": y, "th": th,
+                                "parent": near_idx, "path": path,
+                                "action": [v, w, time]}
+        return closest_node
+
+    def reached_goal(self, node, goal, radius):
         """True if the node is within radius of the goal."""
+        #Check to see how far node is too goal
+
+
 
     def extract_path(nodes, goal_idx):
         """Follow parent pointers back to the root.
