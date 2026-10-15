@@ -2,11 +2,7 @@ import pybullet as p
 import pybullet_data
 import random
 import math
-import random
-from typing import List, Optional, Tuple, Union
-
-import matplotlib.pyplot as plt
-import numpy as np
+from typing import List
 
 random.seed(1)
 
@@ -177,7 +173,7 @@ class Turtlebot():
     def sample_state(self, bounds, goal_bias = 0.5):
         """Return [x, y]: GOAL with 50% probability, else uniform random in the arena."""
         #Does everything above but its bounded by x/y min and  x/y max
-        if random.random < goal_bias:
+        if random.random() < goal_bias:
             return[GOAL[0], GOAL[1]]
         x = random.uniform(bounds[0][0], bounds[0][1])
         y = random.uniform(bounds[1][0], bounds[1][1])
@@ -190,14 +186,14 @@ class Turtlebot():
 
         #Keep closest node in tree
         for i in range(len(nodes)):
-            dx = sample(0) - nodes[i]["x"]
-            dy = sample(1) - nodes[i]["y"]
+            dx = sample[0] - nodes[i]["x"]
+            dy = sample[1] - nodes[i]["y"]
 
             dist = math.sqrt(dx**2 + dy**2)
 
             if dist < closest_dist:
                 closest_dist = dist
-                closest_idx = 1
+                closest_idx = i
 
         return closest_idx
 
@@ -214,8 +210,8 @@ class Turtlebot():
         p.performCollisionDetection()
 
         #See if robo is touching block or wall
-        for obstacles in self.obstacles:
-            contacts = p.getContactPoints(bodyA = self.turtleId, bodyB = obstacles)
+        for obstacle in self.obstacles:
+            contacts = p.getContactPoints(bodyA = self.turtleId, bodyB = obstacle)
             if len(contacts) > 0:
                 return True
         return False
@@ -296,8 +292,8 @@ class Turtlebot():
     def reached_goal(self, node, goal, radius):
         """True if the node is within radius of the goal."""
         #Check to see how far node is too goal
-        dx = goal(0) - node["x"]
-        dy = goal(1) - node["y"]
+        dx = goal[0] - node["x"]
+        dy = goal[1] - node["y"]
         dist = math.sqrt(dx**2 + dy**2)
 
         #Check to see if we are within the goal circle
@@ -318,13 +314,14 @@ class Turtlebot():
             puzzle.append(nodes[idx]["path"])
             idx = nodes[idx]["parent"]
 
-        #Goal to start
-        puzzle = puzzle[:,-1]
+        #Start to goal 
+        puzzle = puzzle[::-1]
 
         #Put path together
         puzzle_path = []
-        for puzzle in puzzle_path:
-            for point in puzzle:
+
+        for piece in puzzle:
+            for point in piece:
                 puzzle_path.append(point)
         return puzzle_path
 
