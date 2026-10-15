@@ -295,7 +295,14 @@ class Turtlebot():
     def reached_goal(self, node, goal, radius):
         """True if the node is within radius of the goal."""
         #Check to see how far node is too goal
+        dx = goal(0) - node["x"]
+        dy = goal(1) - node["y"]
+        dist = math.sqrt(dx**2 + dy**2)
 
+        #Check to see if we are within the goal circle
+        if dist <= radius:
+            return True
+        return False
 
 
     def extract_path(nodes, goal_idx):
