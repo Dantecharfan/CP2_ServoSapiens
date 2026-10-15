@@ -287,6 +287,7 @@ class Turtlebot():
             #Find the closest one and update it 
             if dist < closest_dist:
                 closest_dist = dist
+                #Set key
                 closest_node = {"x": x, "y": y, "th": th,
                                 "parent": near_idx, "path": path,
                                 "action": [v, w, time]}
@@ -305,10 +306,27 @@ class Turtlebot():
         return False
 
 
-    def extract_path(nodes, goal_idx):
+    def extract_path(self, nodes, goal_idx):
         """Follow parent pointers back to the root.
         Return the list of [x, y, z] points from start to goal."""
+        #Set up array of tree pieces 
+        puzzle = []
+        idx = goal_idx
 
+        #follow up tree till we hit the start 
+        while nodes[idx]["parent"] is not None:
+            puzzle.append(nodes[idx]["path"])
+            idx = nodes[idx]["parent"]
+
+        #Goal to start
+        puzzle = puzzle[:,-1]
+
+        #Put path together
+        puzzle_path = []
+        for puzzle in puzzle_path:
+            for point in puzzle:
+                puzzle_path.append(point)
+        return puzzle_path
 
 ### MAIN - implement your solution here! ###
 
