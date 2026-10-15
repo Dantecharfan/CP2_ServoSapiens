@@ -204,6 +204,22 @@ class Turtlebot():
     def in_collision(turtlebot, x, y, th):
         """Teleport robot to (x, y, th), run p.performCollisionDetection(),
         return True if touching any obstacle."""
+        #Angle to quaternion for pybullet
+        quat = p.getQuaternionFromEuler([0, 0, th])
+
+        #Move robo to spot
+        turtlebot.teleport([x, y, 0], quat)
+
+        #Have pybullet update contacts
+        p.performCollisionDetection()
+
+        #See if robo is touching block or wall
+        for obstacles in turtlebot.obstacles:
+            contacts = p.getContactPoints(bodyA = turtlebot.turtleId, bodyB = obstacles)
+            if len(contacts) > 0:
+                return True
+        return False
+
 
     def propagate(turtlebot, node, v, w, duration, dt=0.05):
         """Integrate the unicycle model from node for `duration` seconds.
