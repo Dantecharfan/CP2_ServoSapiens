@@ -1,7 +1,12 @@
 import pybullet as p
 import pybullet_data
 import random
-from typing import List
+import math
+import random
+from typing import List, Optional, Tuple, Union
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 random.seed(1)
 
@@ -169,11 +174,32 @@ class Turtlebot():
             goal_cross_2 = p.addUserDebugLine([intermediate_goal[0], intermediate_goal[1] - size, 0.1], [intermediate_goal[0], intermediate_goal[1] + size, 0.1], lineColorRGB=[0, 0, 1], lineWidth=3)
             self.old_goals.append((intermediate_goal, goal_cross_1, goal_cross_2))
 
-    def sample_state(bounds):
+    def sample_state(self, bounds, goal_bias = 0.5):
         """Return [x, y]: GOAL with 50% probability, else uniform random in the arena."""
-
-    def nearest_node(nodes, sample):
+        #Does everything above but its bounded by x/y min and  x/y max
+        if random.random < goal_bias:
+            return[GOAL[0], GOAL[1]]
+        x = random.uniform(bounds[0][0], bounds[0][1])
+        y = random.uniform(bounds[1][0], bounds[1][1])
+        return [x, y]
+    
+    def nearest_node(self, nodes, sample):
         """Return the index of the tree node closest (Euclidean x,y) to the sample."""
+        closest_idx = 0
+        closest_dist = float("inf")
+
+        #Keep closest node in tree
+        for i in range(len(nodes)):
+            dx = sample(0) - nodes[i]["x"]
+            dy = sample(1) - nodes[i]["y"]
+
+            dist = math.sqrt(dx**2 + dy**2)
+
+            if dist < closest_dist:
+                closest_dist = dist
+                closest_idx = 1
+
+        return closest_idx
 
     def in_collision(turtlebot, x, y, th):
         """Teleport robot to (x, y, th), run p.performCollisionDetection(),
