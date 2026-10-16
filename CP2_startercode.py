@@ -127,24 +127,41 @@ class Turtlebot():
         """
 
         # Supported colors
+        # lineWidth is ignored on Mac (always 1px), so thickness comes from
+        # drawing side-by-side copies spaced `offsets` meters apart.
+        # Green sits higher so the red tree under it doesn't cover it.
         if color_string == "red":
             color = [1, 0, 0]
             line_width = 3
+            offsets = [-0.01, 0.0, 0.01]
+            height = 0.05
         elif color_string == "green":
             color = [0, 1, 0]
             line_width = 10
+            offsets = [-0.04, -0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
+            height = 0.15
         else:
             print("That color does not exist to be viewed. Not plotting Path.")
             return
 
         # Loop through path points and add debug line
         for i in range(1, len(path_points)):
-            p.addUserDebugLine(
-                [path_points[i-1][0], path_points[i-1][1], path_points[i-1][2] + 0.05],
-                [path_points[i][0],   path_points[i][1],   path_points[i][2] + 0.05],
-                color,
-                lineWidth=line_width
-            )
+            x0, y0, z0 = path_points[i-1][0], path_points[i-1][1], path_points[i-1][2] + height
+            x1, y1, z1 = path_points[i][0],   path_points[i][1],   path_points[i][2] + height
+
+            # Unit vector perpendicular to the segment, for the side-by-side copies
+            length = math.hypot(x1 - x0, y1 - y0)
+            if length == 0:
+                continue
+            nx, ny = -(y1 - y0) / length, (x1 - x0) / length
+
+            for off in offsets:
+                p.addUserDebugLine(
+                    [x0 + nx * off, y0 + ny * off, z0],
+                    [x1 + nx * off, y1 + ny * off, z1],
+                    color,
+                    lineWidth=line_width
+                )
     
     def show_intermediate_goal(self, intermediate_goal: List[float]) -> None:
         """
@@ -197,7 +214,7 @@ class Turtlebot():
 
         return closest_idx
 
-    def in_collision(self, x, y, th):
+    def in_collision(self, x, y, th, margin=0.1):
         """Teleport robot to (x, y, th), run p.performCollisionDetection(),
         return True if touching any obstacle."""
         #Angle to quaternion for pybullet
@@ -209,10 +226,11 @@ class Turtlebot():
         #Have pybullet update contacts
         p.performCollisionDetection()
 
-        #See if robo is touching block or wall
+        #See if robo is within margin of a block or wall
+        #(margin gives the real robot room to drift without scraping)
         for obstacle in self.obstacles:
-            contacts = p.getContactPoints(bodyA = self.turtleId, bodyB = obstacle)
-            if len(contacts) > 0:
+            close = p.getClosestPoints(bodyA = self.turtleId, bodyB = obstacle, distance = margin)
+            if len(close) > 0:
                 return True
         return False
 
@@ -340,30 +358,100 @@ if __name__ == "__main__":
 
     # Start recording video 
     log_id = p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "./search.mp4")
-    
+
+    #Each call draws one frame into the video
+    def record_frame(n=1):
+        for _ in range(n):
+            p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING, 1)
+
+    #Plan the whole path first, then drive it
+    bounds = [[0.3, 5.7], [0.3, 5.7]]
+    nodes = [{"x": START_POS[0], "y": START_POS[1], "th": 0.0,
+              "parent": None, "path": [], "action": None}]
+    goal_idx = None
+
+    #Grow the tree till a node lands in the goal circle
+    for it in range(1000):
+        sample = turtlebot.sample_state(bounds)
+
+        #Blue cross on random samples only 
+        #show_intermediate_goal turns the older crosses black
+        if sample != [GOAL[0], GOAL[1]]:
+            turtlebot.show_intermediate_goal([sample[0], sample[1], 0])
+
+        near_idx = turtlebot.nearest_node(nodes, sample)
+        new_node = turtlebot.extend(nodes, near_idx, sample)
+
+        record_frame(15)
+        if new_node is None:
+            continue
+        nodes.append(new_node)
+        if turtlebot.reached_goal(new_node, GOAL, GOAL_RADIUS):
+            goal_idx = len(nodes) - 1
+            print(f"Found goal after {it} iterations, {len(nodes)} nodes")
+            break
+
+    #Turn the last blue cross black now that the search is over
+    turtlebot.show_intermediate_goal(None)
+
+    if goal_idx is None:
+        print("No path found :(")
+    else: #extra credit bonus part section below!
+        #draws solution, resets turtle, declares robot dimensions(from turtlebot.urdf)
+        #picks points to drive to, then steers toward each point and drives to them
+        #also prints data: velocities,
+        path = turtlebot.extract_path(nodes, goal_idx)
+        turtlebot.plot_path("green", path)
+        record_frame(60)
+
+        #in_collision teleported robo all over the map so put it back
+        turtlebot.teleport(START_POS, p.getQuaternionFromEuler([0, 0, 0]))
+
+        #Wheel radius and separation from turtlebot.urdf times globalScaling=2
+        R = 0.07
+        L = 0.46
+
+        #Playing back v, w, time open loop drifts into blocks,
+        #so instead steer toward every few points on the green path
+        waypoints = path[::5] + [path[-1], [GOAL[0], GOAL[1], 0]]
+        step = 0
+        for target in waypoints:
+            for _ in range(2000):
+                x, y, _ = turtlebot.get_position()
+                yaw = p.getEulerFromQuaternion(turtlebot.get_orientation())[2]
+                dx = target[0] - x
+                dy = target[1] - y
+                if math.sqrt(dx**2 + dy**2) < 0.1:
+                    break
+
+                #Heading error wrapped to [-pi, pi]
+                err = math.atan2(dy, dx) - yaw
+                err = math.atan2(math.sin(err), math.cos(err))
+
+                #Slow down while turning a lot
+                v = 0.4 * max(0.0, math.cos(err))
+                w = 3.0 * err
+
+                left = (v - w * L / 2) / R
+                right = (v + w * L / 2) / R
+                turtlebot.set_velocities(leftWheelVelocity=left, rightWheelVelocity=right)
+
+                p.stepSimulation()
+                turtlebot.collision_check()
+
+                step += 1
+                if step % 4 == 0:
+                    record_frame()
+        turtlebot.set_velocities(0, 0)
+        print(f"Ended at {turtlebot.get_position()}")
+        record_frame(60)
+
+    # Stop the recorording 
+    p.stopStateLogging(log_id)
+    p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING, 0)
+
+    #Keep the window open after recording stops, so we can look at it do its thing
     while p.isConnected():
-
-        # Implement your solution in this loop
-        
-        # Some example code below to get familiar with the simulation loop
-
-        # set turtlebot to move forward
-        turtlebot.set_velocities(leftWheelVelocity=10, rightWheelVelocity=10)
-
-        # IMPORTANT - You need to run this command for every step in simulation
-        # Example: if you comment this out your turtlebot will not move despite setting the wheel velocities
-        p.stepSimulation() 
-
-
-        # Command to stop recording
-        p.stopStateLogging(log_id)
-
-        
-
-        
-
-        
-
-
+        p.stepSimulation()
 
     p.disconnect()
